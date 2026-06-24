@@ -1,0 +1,19 @@
+{
+  "generated": "2026-06-23T04:10:00-05:00",
+  "issues": [
+    {
+      "id": "reveille-2026-06-23",
+      "type": "REVEILLE",
+      "title": "Daily Brief",
+      "date": "2026-06-23",
+      "file": "reveille-2026-06-23.html"
+    },
+    {
+      "id": "defilade-2026-06-20",
+      "type": "DEFILADE",
+      "title": "Weekend Reading",
+      "date": "2026-06-20",
+      "file": "defilade-2026-06-20.html"
+    }
+  ]
+}

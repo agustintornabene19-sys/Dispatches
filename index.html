@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#0f2a3f" />
+<title>Dispatches</title>
+<link rel="manifest" href="manifest.webmanifest" />
+<link rel="icon" href="icon.svg" />
+<link rel="apple-touch-icon" href="icon.svg" />
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <!-- LIST VIEW -->
+  <div id="list-view" class="view">
+    <header class="masthead">
+      <div class="masthead-row">
+        <h1 class="wordmark">DISPATCHES</h1>
+        <button id="refresh-btn" class="icon-btn" title="Refresh" aria-label="Refresh">&#x21bb;</button>
+      </div>
+      <p class="tagline">REVEILLE &amp; DEFILADE</p>
+    </header>
+
+    <nav class="tabs" id="tabs">
+      <button class="tab active" data-filter="ALL">All</button>
+      <button class="tab" data-filter="REVEILLE">Reveille</button>
+      <button class="tab" data-filter="DEFILADE">Defilade</button>
+    </nav>
+
+    <main id="issue-list" class="issue-list" aria-live="polite"></main>
+
+    <p id="status-line" class="status-line"></p>
+  </div>
+
+  <!-- READER VIEW -->
+  <div id="reader-view" class="view hidden">
+    <header class="reader-bar">
+      <button id="back-btn" class="text-btn" aria-label="Back">&#x2039;&nbsp;Back</button>
+      <span id="reader-title" class="reader-title"></span>
+      <button id="open-ext-btn" class="icon-btn" title="Open full page" aria-label="Open full page">&#x2197;</button>
+    </header>
+    <iframe id="reader-frame" class="reader-frame" title="Digest" referrerpolicy="no-referrer"></iframe>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

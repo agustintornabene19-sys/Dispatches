@@ -1,0 +1,15 @@
+{
+  "name": "Dispatches — Reveille & Defilade",
+  "short_name": "Dispatches",
+  "description": "Agustin's personal news digests, assembled from his inbox.",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0f2a3f",
+  "theme_color": "#0f2a3f",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "icon-maskable.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ]
+}
