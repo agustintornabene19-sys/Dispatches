@@ -1,6 +1,13 @@
 {
-  "generated": "2026-06-23T04:10:00-05:00",
+  "generated": "2026-06-25T05:30:00-05:00",
   "issues": [
+    {
+      "id": "reveille-2026-06-25",
+      "type": "REVEILLE",
+      "title": "Daily Brief",
+      "date": "2026-06-25",
+      "file": "reveille-2026-06-25.html"
+    },
     {
       "id": "reveille-2026-06-24",
       "type": "REVEILLE",
