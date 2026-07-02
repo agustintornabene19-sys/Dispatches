@@ -1,0 +1,60 @@
+# ============================================================
+# SOURCES for REVEILLE / DEFILADE
+# This is a plain list you can edit by hand on GitHub
+# (open the file -> pencil icon -> change -> Commit changes).
+# Lines starting with # are comments and are ignored.
+# ============================================================
+
+# --- Emails: newsletters are kept only if the sender's address
+#     contains one of these fragments. Add a fragment when you
+#     subscribe to something new.
+email_sender_domains:
+  - substack.com
+  - punchbowl.news
+  - politico.com
+  - thedispatch.com
+  - foreignaffairs.com
+  - fdd.org
+  - amwaj.media
+  - compactmag.com
+  - unherd.com
+  - city-journal.org
+  - newcriterion.com
+  - firstthings.com
+  - nybooks.com
+  - newleftreview.org
+  - engelsbergideas.com
+  - monde-diplomatique.fr
+  - eldebate.com
+  - theobjective.com
+  - infobae.com
+  - frontpopulaire.fr
+  - causeur.fr
+  - letraslibres.com
+  - pillarcatholic.com
+
+# --- RSS feeds: checked directly, no subscription needed.
+#     If one keeps failing it just gets noted in the run log;
+#     nothing breaks. Delete or add entries freely.
+rss_feeds:
+  # Military / professional
+  - {name: Modern War Institute, url: "https://mwi.westpoint.edu/feed/"}
+  - {name: War on the Rocks, url: "https://warontherocks.com/feed/"}
+  - {name: Wavell Room, url: "https://wavellroom.com/feed/"}
+
+  # Magazines & journals
+  - {name: UnHerd, url: "https://unherd.com/feed/"}
+  - {name: Compact, url: "https://www.compactmag.com/feed/"}
+  - {name: City Journal, url: "https://www.city-journal.org/rss.xml"}
+  - {name: First Things, url: "https://www.firstthings.com/rss/web-exclusives"}
+  - {name: The New Criterion, url: "https://newcriterion.com/feed"}
+  - {name: Engelsberg Ideas, url: "https://engelsbergideas.com/feed/"}
+
+  # New additions (2026-07)
+  - {name: American Affairs, url: "https://americanaffairsjournal.org/feed/"}
+  - {name: Palladium, url: "https://www.palladiummag.com/feed/"}
+  - {name: The Lamp, url: "https://thelampmagazine.com/rss"}
+  - {name: Claremont Review of Books, url: "https://claremontreviewofbooks.com/feed/"}
+  - {name: The New Atlantis, url: "https://www.thenewatlantis.com/feed"}
+  - {name: RUSI Commentary, url: "https://www.rusi.org/rss.xml"}
+  - {name: Le Grand Continent, url: "https://legrandcontinent.eu/fr/feed/"}
