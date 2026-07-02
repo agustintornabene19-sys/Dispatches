@@ -32,7 +32,7 @@ import sys
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from pathlib import Path
-from urllib.parse import parse_qs, urlparse, urlunparse
+from urllib.parse import parse_qs, quote, urlparse, urlunparse
 
 import feedparser
 import requests
@@ -234,6 +234,71 @@ def gather_email_candidates(cfg, since_days):
     return candidates
 
 
+# ---------------------------------------------------------- reader feedback
+
+FEEDBACK_PREFIX = "DISPATCH FEEDBACK"
+
+
+def gather_feedback(days=90):
+    """Read feedback emails the reader sent to himself via the digest's
+    'more / less / never again' links. Subject format:
+    DISPATCH FEEDBACK <MORE|LESS|NEVER> :: <source> :: <url>"""
+    address = os.environ["GMAIL_ADDRESS"]
+    password = os.environ["GMAIL_APP_PASSWORD"]
+    entries = []
+    try:
+        imap = imaplib.IMAP4_SSL("imap.gmail.com")
+        imap.login(address, password)
+        imap.select('"[Gmail]/All Mail"', readonly=True)
+        since = (dt.datetime.now(UTC) - dt.timedelta(days=days)).strftime("%d-%b-%Y")
+        _, data = imap.search(None, f'(SUBJECT "{FEEDBACK_PREFIX}" SINCE "{since}")')
+        for msg_id in data[0].split():
+            _, hdr = imap.fetch(msg_id, "(BODY.PEEK[HEADER.FIELDS (SUBJECT DATE)])")
+            raw = b"".join(p[1] for p in hdr if isinstance(p, tuple))
+            m = email.message_from_bytes(raw)
+            subject = decode_header(m.get("Subject", ""))
+            parts = [p.strip() for p in subject.split("::")]
+            verb = next((v for v in ("NEVER", "LESS", "MORE")
+                         if v in parts[0].upper()), None)
+            if not verb or len(parts) < 3 or not parts[2].startswith("http"):
+                continue
+            entries.append({"verb": verb, "source": parts[1], "url": parts[2],
+                            "date": decode_header(m.get("Date", ""))})
+        imap.logout()
+        log(f"feedback: {len(entries)} entries found in mailbox")
+    except Exception as e:
+        log(f"WARNING: feedback fetch failed: {e}")
+    return entries
+
+
+def inject_feedback_links(html_doc, address, url_sources):
+    """After the first link to each article, add tiny mailto links:
+    [more · less · never again]. Tapping one opens a pre-filled email
+    to self, which the next run picks up as feedback."""
+    seen = set()
+
+    def repl(match):
+        url = match.group(2)
+        key = canonical_key(url)
+        if key in seen or key not in url_sources:
+            return match.group(0)
+        seen.add(key)
+        source = url_sources[key]
+
+        def mk(verb, label):
+            subj = quote(f"{FEEDBACK_PREFIX} {verb} :: {source} :: {url}")
+            return (f'<a href="mailto:{address}?subject={subj}" '
+                    f'style="color:#999;text-decoration:none">{label}</a>')
+
+        return (match.group(0)
+                + ' <span style="font-size:11px;color:#aaa;white-space:nowrap">['
+                + mk("MORE", "more") + " · " + mk("LESS", "less") + " · "
+                + mk("NEVER", "never again") + "]</span>")
+
+    return re.sub(r'(<a href="(https?://[^"]+)"[^>]*>.*?</a>)',
+                  repl, html_doc, flags=re.S)
+
+
 # ------------------------------------------------------------- RSS feeds
 
 def gather_rss_candidates(cfg, since_days):
@@ -281,7 +346,8 @@ def gather_rss_candidates(cfg, since_days):
 
 # ------------------------------------------------------------- Claude call
 
-def call_claude(prompt_text, candidates, digest_type, today_str, leftovers):
+def call_claude(prompt_text, candidates, digest_type, today_str, leftovers,
+                feedback_entries=None):
     import anthropic
     client = anthropic.Anthropic()  # reads ANTHROPIC_API_KEY
     model = os.environ.get("CLAUDE_MODEL", "claude-sonnet-5")
@@ -293,6 +359,11 @@ def call_claude(prompt_text, candidates, digest_type, today_str, leftovers):
     }
     if leftovers:
         payload["earlier_this_week_unused"] = leftovers
+    if feedback_entries:
+        payload["reader_feedback"] = [
+            {"verb": e["verb"], "source": e["source"], "url": e["url"]}
+            for e in feedback_entries[-150:]
+        ]
 
     user_msg = (
         "Here are the candidate articles gathered from the inbox and RSS feeds, "
@@ -391,14 +462,27 @@ def main():
     rss_cands, failed_feeds = gather_rss_candidates(cfg, since_days)
     candidates = email_cands + rss_cands
 
-    # 2. dedupe against everything already published
+    # 2a. reader feedback: merge new feedback emails into feedback.json
+    fb_path = REPO_ROOT / "feedback.json"
+    feedback = load_json(fb_path, {"entries": []})
+    known = {(e["verb"], canonical_key(e["url"])) for e in feedback["entries"]}
+    for e in gather_feedback():
+        sig = (e["verb"], canonical_key(e["url"]))
+        if sig not in known:
+            feedback["entries"].append(e)
+            known.add(sig)
+    save_json(fb_path, feedback)
+    never_keys = {canonical_key(e["url"])
+                  for e in feedback["entries"] if e["verb"] == "NEVER"}
+
+    # 2b. dedupe against everything already published + 'never again' items
     published = load_json(REPO_ROOT / "published.json",
                           {"used": [], "recent_candidates": []})
     used_keys = {canonical_key(u) for u in published["used"]}
     fresh, seen = [], set()
     for c in candidates:
         key = canonical_key(c["url"]) if c.get("url") else c["title"].lower()
-        if key in used_keys or key in seen:
+        if key in used_keys or key in seen or key in never_keys:
             continue
         seen.add(key)
         fresh.append(c)
@@ -416,11 +500,18 @@ def main():
     if failed_feeds:
         notes.append(f"[{len(failed_feeds)} RSS feeds unreachable this run]")
     try:
-        html_doc = call_claude(prompt_text, fresh, digest_type, pretty_date, leftovers)
+        html_doc = call_claude(prompt_text, fresh, digest_type, pretty_date,
+                               leftovers, feedback["entries"])
     except Exception as e:
         log(f"WARNING: Claude call failed: {e}")
         notes.append(f"[curation failed this run — {e.__class__.__name__}]")
         html_doc = fallback_html(digest_type, pretty_date, fresh, str(e)[:200])
+
+    # add per-article 'more / less / never again' feedback links
+    url_sources = {canonical_key(c["url"]): c["source"]
+                   for c in fresh + leftovers if c.get("url")}
+    html_doc = inject_feedback_links(html_doc, os.environ["GMAIL_ADDRESS"],
+                                     url_sources)
 
     # 4. write issue + index + ledger
     filename = f"{digest_type}-{today_str}.html"
