@@ -366,8 +366,10 @@ def call_claude(prompt_text, candidates, digest_type, today_str, leftovers,
         ]
 
     user_msg = (
-        "Here are the candidate articles gathered from the inbox and RSS feeds, "
-        "as JSON. Build today's issue per your instructions.\n\n"
+        "Here are the candidate articles gathered from the reader's own email "
+        "subscriptions and public RSS feeds, as JSON. Build today's issue per "
+        "your instructions — a personal digest of brief, attributed excerpts "
+        "that link out to each source.\n\n"
         "STRICT RULES: Use ONLY URLs that appear in this JSON — never invent or "
         "modify a link. Quote/excerpt only from the excerpt text provided. "
         "Respond with the COMPLETE, self-contained HTML document for the issue "
@@ -375,19 +377,64 @@ def call_claude(prompt_text, candidates, digest_type, today_str, leftovers,
         + json.dumps(payload, ensure_ascii=False)
     )
 
-    resp = client.messages.create(
-        model=model,
-        max_tokens=16000,
-        system=prompt_text,
-        messages=[{"role": "user", "content": user_msg}],
-    )
-    text = "".join(b.text for b in resp.content if b.type == "text").strip()
-    # strip accidental markdown fences
+    def ask(messages):
+        resp = client.messages.create(
+            model=model,
+            max_tokens=20000,
+            system=prompt_text,
+            messages=messages,
+        )
+        return "".join(b.text for b in resp.content if b.type == "text").strip()
+
+    messages = [{"role": "user", "content": user_msg}]
+    text = ask(messages)
+    html_doc = extract_html(text)
+    if html_doc is None:
+        log("model reply was not HTML; first 300 chars: "
+            + text[:300].replace("\n", " "))
+        messages += [
+            {"role": "assistant", "content": text},
+            {"role": "user", "content":
+                "That was not an HTML document. Reply now with ONLY the "
+                "complete self-contained HTML document for the issue — begin "
+                "with <!DOCTYPE html> and include nothing before or after it. "
+                "Reminder: the format is brief quoted excerpts with clear "
+                "attribution and a link to each source (the reader's own "
+                "subscriptions); do not reproduce full articles."},
+        ]
+        text = ask(messages)
+        html_doc = extract_html(text)
+    if html_doc is None:
+        log("retry was not HTML either; first 300 chars: "
+            + text[:300].replace("\n", " "))
+        raise ValueError("model response did not contain an HTML document")
+    return html_doc
+
+
+def extract_html(text):
+    """Pull an HTML document out of a model reply, tolerating preambles,
+    markdown fences, and bare fragments. Returns None if no HTML found."""
+    text = text.strip()
     text = re.sub(r"^```(?:html)?\s*", "", text)
     text = re.sub(r"\s*```$", "", text)
-    if "<html" not in text.lower():
-        raise ValueError("model response did not contain an HTML document")
-    return text
+    low = text.lower()
+    starts = [i for i in (low.find("<!doctype"), low.find("<html")) if i != -1]
+    if starts:
+        doc = text[min(starts):]
+        if "</html>" in doc.lower():
+            return doc
+        return doc + "</body></html>"
+    m = re.search(r"<(body|div|table)[\s>]", text, re.I)
+    if not m:
+        return None
+    frag = text[m.start():]
+    head = ('<head><meta charset="utf-8"><meta name="viewport" '
+            'content="width=device-width, initial-scale=1"></head>')
+    if frag.lower().startswith("<body"):
+        return f"<!DOCTYPE html><html>{head}{frag}" + \
+            ("" if "</html>" in frag.lower() else "</html>")
+    return (f'<!DOCTYPE html><html>{head}<body style="margin:0;'
+            f'background:#f4f1ea">{frag}</body></html>')
 
 
 def fallback_html(digest_type, today_str, candidates, note):
@@ -508,46 +555,4 @@ def main():
         html_doc = fallback_html(digest_type, pretty_date, fresh, str(e)[:200])
 
     # add per-article 'more / less / never again' feedback links
-    url_sources = {canonical_key(c["url"]): c["source"]
-                   for c in fresh + leftovers if c.get("url")}
-    html_doc = inject_feedback_links(html_doc, os.environ["GMAIL_ADDRESS"],
-                                     url_sources)
-
-    # 4. write issue + index + ledger
-    filename = f"{digest_type}-{today_str}.html"
-    (REPO_ROOT / filename).write_text(html_doc, encoding="utf-8")
-    title = "Daily Brief" if digest_type == "reveille" else "Weekend Reading"
-    update_index(f"{digest_type}-{today_str}", digest_type, title, today_str, filename)
-
-    used_now = re.findall(r'href="(https?://[^"]+)"', html_doc)
-    published["used"] = (published["used"] + used_now)[-3000:]
-    used_now_keys = {canonical_key(u) for u in used_now}
-    # keep a 7-day pool of unused candidates for DEFILADE to mine
-    pool = published.get("recent_candidates", []) if digest_type == "reveille" else []
-    if digest_type == "reveille":
-        stamp = today_str
-        for c in fresh:
-            if c.get("url") and canonical_key(c["url"]) not in used_now_keys:
-                pool.append({"seen": stamp, "source": c["source"],
-                             "title": c["title"], "url": c["url"],
-                             "excerpt": c["excerpt"][:1200]})
-        cutoff = (today - dt.timedelta(days=7)).isoformat()
-        pool = [c for c in pool if c["seen"] >= cutoff][-250:]
-    published["recent_candidates"] = pool if digest_type == "reveille" else []
-    save_json(REPO_ROOT / "published.json", published)
-    log(f"wrote {filename}, updated index.json and published.json")
-
-    # 5. email
-    weekday = today.strftime("%A")
-    day_month = today.strftime("%d %B").lstrip("0")
-    subject = (f"REVEILLE — Daily Brief · {weekday}, {day_month}"
-               if digest_type == "reveille"
-               else f"DEFILADE — Weekend Reading · {weekday}, {day_month}")
-    try:
-        send_email(subject, html_doc, notes)
-    except Exception as e:
-        log(f"WARNING: email send failed: {e} (issue is still published to the app)")
-
-
-if __name__ == "__main__":
-    main()
+    u
