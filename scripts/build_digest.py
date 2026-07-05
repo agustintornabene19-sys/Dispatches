@@ -555,4 +555,48 @@ def main():
         html_doc = fallback_html(digest_type, pretty_date, fresh, str(e)[:200])
 
     # add per-article 'more / less / never again' feedback links
-    u
+    url_sources = {canonical_key(c["url"]): c["source"]
+                   for c in fresh + leftovers if c.get("url")}
+    html_doc = inject_feedback_links(html_doc, os.environ["GMAIL_ADDRESS"],
+                                     url_sources)
+
+    # 4. write issue + index + ledger
+    filename = f"{digest_type}-{today_str}.html"
+    (REPO_ROOT / filename).write_text(html_doc, encoding="utf-8")
+    title = "Daily Brief" if digest_type == "reveille" else "Weekend Reading"
+    update_index(f"{digest_type}-{today_str}", digest_type, title, today_str, filename)
+
+    used_now = re.findall(r'href="(https?://[^"]+)"', html_doc)
+    used_now = [u for u in used_now if not u.startswith("mailto:")]
+    published["used"] = (published["used"] + used_now)[-3000:]
+    used_now_keys = {canonical_key(u) for u in used_now}
+    # keep a 7-day pool of unused candidates for DEFILADE to mine
+    pool = published.get("recent_candidates", []) if digest_type == "reveille" else []
+    if digest_type == "reveille":
+        stamp = today_str
+        for c in fresh:
+            if c.get("url") and canonical_key(c["url"]) not in used_now_keys:
+                pool.append({"seen": stamp, "source": c["source"],
+                             "title": c["title"], "url": c["url"],
+                             "excerpt": c["excerpt"][:1200]})
+        cutoff = (today - dt.timedelta(days=7)).isoformat()
+        pool = [c for c in pool if c["seen"] >= cutoff][-250:]
+    published["recent_candidates"] = pool if digest_type == "reveille" else []
+    save_json(REPO_ROOT / "published.json", published)
+    log(f"wrote {filename}, updated index.json and published.json")
+
+    # 5. email
+    weekday = today.strftime("%A")
+    day_month = today.strftime("%d %B").lstrip("0")
+    subject = (f"REVEILLE — Daily Brief · {weekday}, {day_month}"
+               if digest_type == "reveille"
+               else f"DEFILADE — Weekend Reading · {weekday}, {day_month}")
+    try:
+        send_email(subject, html_doc, notes)
+    except Exception as e:
+        log(f"WARNING: email send failed: {e} (issue is still published to the app)")
+    log("run complete")
+
+
+if __name__ == "__main__":
+    main()
