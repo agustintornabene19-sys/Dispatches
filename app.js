@@ -74,6 +74,38 @@ function showList() {
   currentFile = null;
 }
 
+// Issues are email-first (fixed 660px table layout). Inside the in-app reader
+// they load in an iframe, which (a) tries to open links inside the frame — and
+// many sites refuse to be framed, so the link looks broken — and (b) can't
+// shrink the 660px layout, causing side-to-side scrolling on phones. Since the
+// issue HTML is served from this same origin, we can reach into it on load and
+// fix both: force links to open in a new tab, and force the content to fit.
+function styleFrame() {
+  try {
+    const doc = els.frame.contentDocument;
+    if (!doc || !doc.head || els.frame.src === 'about:blank') return;
+    if (!doc.querySelector('base[data-dispatches]')) {
+      const base = doc.createElement('base');
+      base.target = '_blank';
+      base.setAttribute('data-dispatches', '');
+      doc.head.insertBefore(base, doc.head.firstChild);
+    }
+    if (!doc.querySelector('style[data-dispatches]')) {
+      const st = doc.createElement('style');
+      st.setAttribute('data-dispatches', '');
+      st.textContent =
+        'html,body{overflow-x:hidden!important;margin:0!important}' +
+        'body *{max-width:100%!important}' +
+        'table{width:100%!important}' +
+        'img,svg,video{height:auto!important}';
+      doc.head.appendChild(st);
+    }
+  } catch (e) {
+    // If the frame is blank or ever cross-origin, leave it untouched.
+  }
+}
+els.frame.addEventListener('load', styleFrame);
+
 async function loadIndex(force) {
   const spinning = els.refresh;
   spinning.classList.add('spin');

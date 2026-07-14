@@ -2,8 +2,11 @@ name: Build digests
 
 on:
   schedule:
-    # 03:00 UTC = 05:00 in Poland during summer time (04:00 in winter).
-    - cron: "0 3 * * 1-6"   # Mon–Fri = REVEILLE, Saturday = DEFILADE
+    # 02:41 UTC ≈ 04:41 in Poland (summer) / 03:41 (winter). Deliberately an
+    # odd minute and NOT the top of the hour: GitHub's shared scheduler is most
+    # backed up at :00, which was pushing runs hours late. Aiming a bit before
+    # 05:00 leaves buffer for any residual best-effort delay.
+    - cron: "41 2 * * 1-6"   # Mon–Fri = REVEILLE, Saturday = DEFILADE
   workflow_dispatch:        # lets you run it manually from the Actions tab
     inputs:
       digest:

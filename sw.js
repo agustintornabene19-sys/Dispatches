@@ -1,7 +1,7 @@
 'use strict';
 
 // Bump this version to force the shell to refresh after you edit app files.
-const VERSION = 'dispatches-v1';
+const VERSION = 'dispatches-v2';
 const SHELL = [
   './',
   'index.html',
