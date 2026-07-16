@@ -510,6 +510,19 @@ def main():
     today_str = today.isoformat()
     pretty_date = today.strftime("%A, %d %B %Y")
 
+    # Idempotency guard. The punctual run comes from an external cron
+    # (cron-job.org) hitting workflow_dispatch; GitHub's own `schedule:` trigger
+    # is kept only as a late backup. So a *scheduled* run skips when today's
+    # issue is already published (prevents a duplicate build + email), while
+    # workflow_dispatch / manual runs always build (so the external trigger and
+    # manual testing keep working). GITHUB_EVENT_NAME is set automatically by
+    # the Actions runner; unset when run locally, so local runs never skip.
+    if os.environ.get("GITHUB_EVENT_NAME") == "schedule" \
+            and (REPO_ROOT / f"{digest_type}-{today_str}.html").exists():
+        log(f"{digest_type}-{today_str}.html already published today; "
+            "scheduled backup run — skipping to avoid a duplicate")
+        return
+
     prompt_text = (REPO_ROOT / "prompts" / f"{digest_type}.md").read_text(encoding="utf-8")
 
     # 1. gather
