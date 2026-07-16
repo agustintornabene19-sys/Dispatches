@@ -1,6 +1,6 @@
 # HANDOFF — Dispatches (REVEILLE / DEFILADE digest system)
 
-Last updated: 2026-07-05. Written for any model/assistant picking up this project cold.
+Last updated: 2026-07-16. Written for any model/assistant picking up this project cold.
 
 ## What this is
 
@@ -60,9 +60,9 @@ GitHub Pages serves the repo root → the "Dispatches" PWA on his phone reads in
 
 ## Schedule
 
-Single cron `0 3 * * 1-6` (UTC) = 05:00 in Poland during summer time (04:00 in winter — accepted quirk). The workflow decides the digest type by day-of-week: Saturday (`date -u +%u` = 6) → DEFILADE, else REVEILLE. Manual runs: Actions tab → Build digests → Run workflow → **the digest dropdown matters**. When he moves stateside, only the cron line needs changing — but see the token limitation.
+Cron is `41 2 * * 1-6` (UTC) — an odd minute, ~02:41 UTC ≈ 04:41 Poland summer / 03:41 winter. The workflow decides the digest type by day-of-week: Saturday (`date -u +%u` = 6) → DEFILADE, else REVEILLE. Manual runs: Actions tab → Build digests → Run workflow → **the digest dropdown matters**. When he moves stateside, only the cron line needs changing — but see the token limitation.
 
-GitHub cron is best-effort: runs can start 5–15+ min late, and the first occurrence after editing the schedule is sometimes skipped entirely.
+**GitHub's `schedule:` trigger is badly unreliable here.** Measured from the Actions API over Jul 6–16, scheduled runs landed **6.5–12 hours** after the 02:41 UTC target — variable, not a fixed offset — so REVEILLE arrives late morning Poland time instead of ~05:00. Moving the cron off the top of the hour (`0` → `41`) helped only marginally; no cron value fixes a multi-hour *variable* backlog. By contrast, `workflow_dispatch`/API-triggered and push runs start within seconds. The durable fix is to trigger the workflow from a reliable external cron (e.g. cron-job.org) hitting the `workflow_dispatch` REST endpoint at the target time, then drop `schedule:` (or make the script idempotent per day) so the late scheduled run doesn't fire a duplicate. Changing triggers means editing `.github/workflows/digests.yml` — Agustin must paste it via the web UI (the PAT can't touch `.github/workflows/`). Triggering `workflow_dispatch` via the API also needs a token with **Actions: write** (the existing PAT is Contents-only).
 
 ## Secrets (repo Settings → Secrets and variables → Actions)
 
@@ -90,6 +90,7 @@ Every article link in an issue gets small `[more · less · never again]` links 
 1. **Windows short-name uploads.** Drag-and-drop upload to GitHub from his machine turned `.github` → `GITHUB~1`, `requirements.txt` → `REQUIR~1.TXT`. If he uploads files, verify names afterward. Prefer web-UI "Create new file" or direct pushes.
 2. **Fallback issues (Jul 3–4).** The model's reply sometimes isn't a bare HTML doc. Fixed with tolerant extraction (`extract_html`) + one corrective retry + logging of the reply head on failure.
 3. **Truncated script (Jul 5).** A pushed copy of `build_digest.py` was cut off mid-file — syntactically valid, so `py_compile` passed, but the `if __name__ == "__main__"` guard was gone: green 19-second runs that did nothing. Lessons: (a) a healthy run takes 3–6 minutes — **a sub-minute green run means the script didn't really run**; (b) verify pushed files end with `main()`; (c) there can be sync lag between the Cowork file-tools view and the sandbox mount of the outputs folder — when editing this project, verify the bytes in the sandbox (`tail` the file) before pushing, or edit via shell directly.
+4. **Truncated digests (Jul 15–16).** Token-heavy multilingual issues (Arabic/French/Spanish) — plus adaptive-thinking tokens on `claude-sonnet-5` — ran past the model's `max_tokens` cap (was 20000). The reply was cut off mid-issue, and `extract_html` stapled a `</body></html>` onto the fragment and published it silently. Fix (commit 829781f): the model call now **streams** with a **64000-token** cap, and a `stop_reason == "max_tokens"` raises so `main()` publishes the complete raw-list fallback instead of a fragment. Lesson: a truncated reply can pass as valid HTML — trust `stop_reason`, not the presence of closing tags.
 
 ## Diagnostics cheat-sheet
 
