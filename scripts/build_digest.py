@@ -378,13 +378,21 @@ def call_claude(prompt_text, candidates, digest_type, today_str, leftovers,
     )
 
     def ask(messages):
-        resp = client.messages.create(
+        # Stream so a large max_tokens can't trip the SDK's request timeout.
+        with client.messages.stream(
             model=model,
-            max_tokens=20000,
+            max_tokens=64000,
             system=prompt_text,
             messages=messages,
-        )
-        return "".join(b.text for b in resp.content if b.type == "text").strip()
+        ) as stream:
+            resp = stream.get_final_message()
+        text = "".join(b.text for b in resp.content if b.type == "text").strip()
+        # If the model ran into the length cap it was cut off mid-issue.
+        # Never publish a truncated fragment: raise so main() falls back to a
+        # complete raw-list issue instead of a half-written one.
+        if resp.stop_reason == "max_tokens":
+            raise ValueError("model output hit the length cap (truncated)")
+        return text
 
     messages = [{"role": "user", "content": user_msg}]
     text = ask(messages)
