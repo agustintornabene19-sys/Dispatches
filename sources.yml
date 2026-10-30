@@ -1,60 +1,145 @@
 # ============================================================
 # SOURCES for REVEILLE / DEFILADE
-# This is a plain list you can edit by hand on GitHub
+# Plain list you can edit by hand on GitHub
 # (open the file -> pencil icon -> change -> Commit changes).
 # Lines starting with # are comments and are ignored.
+#
+# Every source has two tags:
+#   desk:   where it usually belongs. One of:
+#           Washington | Middle East | Europe & NATO-Russia |
+#           Military | Essays | Continental | Back Page
+#           (the editor can still move a piece; this is the default,
+#            and it's what the no-AI backup issue uses to sort)
+#   access: free        - anyone can read it
+#           subscribed  - you pay for it or get it via the MWR library
+#                         (never counts against the paid cap)
+#           paid        - paywalled for you (capped per issue, see below)
 # ============================================================
 
-# --- Emails: newsletters are kept only if the sender's address
-#     contains one of these fragments. Add a fragment when you
-#     subscribe to something new.
-email_sender_domains:
-  - substack.com
-  - punchbowl.news
-  - politico.com
+# --- Paid links allowed per issue. Anything over the cap is dropped,
+#     free and subscribed links are unlimited.
+max_paid_per_issue:
+  reveille: 2
+  defilade: 2
+
+# --- Link-level access rules. These win over a source's own tag, so a
+#     free newsletter that links to a WSJ story is judged by the WSJ link.
+#     Match is on the end of the web address (e.g. "wsj.com" also
+#     matches "www.wsj.com").
+subscribed_domains:
+  - monde-diplomatique.fr     # personal subscription
+  - newcriterion.com          # personal subscription
+  - wsj.com                   # DoD MWR library pass
+  - foreignpolicy.com         # DoD MWR library
+paid_domains:
   - thedispatch.com
-  - foreignaffairs.com
-  - fdd.org
-  - amwaj.media
-  - compactmag.com
-  - unherd.com
-  - city-journal.org
-  - newcriterion.com
-  - firstthings.com
-  - nybooks.com
-  - newleftreview.org
-  - engelsbergideas.com
-  - monde-diplomatique.fr
-  - eldebate.com
-  - theobjective.com
-  - infobae.com
-  - frontpopulaire.fr
-  - causeur.fr
-  - letraslibres.com
-  - pillarcatholic.com
+  - politicopro.com           # Politico Pro (Politico.com itself is free)
+  - nytimes.com
+  - washingtonpost.com
+  - ft.com
+  - economist.com
+  - bloomberg.com
+  - theatlantic.com
+  - newyorker.com
+  - lefigaro.fr
+  - lemonde.fr
+  - elpais.com
+  - andrewsullivan.substack.com
+  - graymirror.substack.com
+# Paid Substack posts are also caught automatically by their
+# "This post is for paid subscribers" wording, whatever the Substack.
+
+# --- Emails: newsletters are kept only if the sender's address
+#     contains the `match` fragment. First match wins, so put more
+#     specific fragments (e.g. a single Substack) above general ones.
+email_senders:
+  # Washington
+  - {match: punchbowl.news,       name: Punchbowl News,     desk: Washington,           access: free}
+  - {match: politico.com,         name: Politico,           desk: Washington,           access: free}
+  - {match: thedispatch.com,      name: The Dispatch,       desk: Washington,           access: paid}
+  # Middle East
+  - {match: fdd.org,              name: FDD,                desk: Middle East,          access: free}
+  - {match: amwaj.media,          name: Amwaj.media,        desk: Middle East,          access: free}
+  # Essays & magazines
+  - {match: foreignaffairs.com,   name: Foreign Affairs,    desk: Essays,               access: free}
+  - {match: compactmag.com,       name: Compact,            desk: Essays,               access: free}
+  - {match: unherd.com,           name: UnHerd,             desk: Essays,               access: free}
+  - {match: city-journal.org,     name: City Journal,       desk: Essays,               access: free}
+  - {match: newcriterion.com,     name: The New Criterion,  desk: Essays,               access: subscribed}
+  - {match: firstthings.com,      name: First Things,       desk: Essays,               access: free}
+  - {match: nybooks.com,          name: NY Review of Books, desk: Essays,               access: free}
+  - {match: newleftreview.org,    name: New Left Review,    desk: Essays,               access: free}
+  - {match: engelsbergideas.com,  name: Engelsberg Ideas,   desk: Essays,               access: free}
+  - {match: pillarcatholic.com,   name: The Pillar,         desk: Back Page,            access: free}
+  # Continental (French / Spanish)
+  - {match: monde-diplomatique.fr, name: Le Monde diplomatique, desk: Continental,      access: subscribed}
+  - {match: eldebate.com,         name: El Debate,          desk: Continental,          access: free}
+  - {match: theobjective.com,     name: The Objective,      desk: Continental,          access: free}
+  - {match: infobae.com,          name: Infobae,            desk: Continental,          access: free}
+  - {match: frontpopulaire.fr,    name: Front Populaire,    desk: Continental,          access: free}
+  - {match: causeur.fr,           name: Causeur,            desk: Continental,          access: free}
+  - {match: letraslibres.com,     name: Letras Libres,      desk: Continental,          access: free}
+  # Substack last: catches every Substack you subscribe to
+  - {match: substack.com,         name: "",                 desk: Essays,               access: free}
 
 # --- RSS feeds: checked directly, no subscription needed.
-#     If one keeps failing it just gets noted in the run log;
-#     nothing breaks. Delete or add entries freely.
+#     If one fails it's noted in the run log; nothing breaks.
 rss_feeds:
+  # Washington
+  - {name: Semafor,                   url: "https://www.semafor.com/rss.xml",                         desk: Washington, access: free}
+  - {name: Politico,                  url: "https://rss.politico.com/politics-news.xml",              desk: Washington, access: free}
+  - {name: Law & Liberty,             url: "https://lawliberty.org/feed/",                            desk: Washington, access: free}
+  - {name: Responsible Statecraft,    url: "https://responsiblestatecraft.org/feed/",                 desk: Washington, access: free}
+  - {name: The American Conservative, url: "https://www.theamericanconservative.com/feed/",          desk: Washington, access: free}
+  - {name: Lawfare,                   url: "https://www.lawfaremedia.org/feeds/articles",             desk: Washington, access: free}
+
+  # Middle East
+  - {name: Middle East Eye,           url: "https://www.middleeasteye.net/rss",                       desk: Middle East, access: free}
+  - {name: Crisis Group,              url: "https://www.crisisgroup.org/rss.xml",                     desk: Middle East, access: free}
+  - {name: Amwaj.media,               url: "https://amwaj.media/rss",                                 desk: Middle East, access: free}
+
+  # Europe & NATO-Russia
+  - {name: ISW,                       url: "https://www.understandingwar.org/rss.xml",                desk: Europe & NATO-Russia, access: free}
+  - {name: Meduza,                    url: "https://meduza.io/rss/en/all",                            desk: Europe & NATO-Russia, access: free}
+  - {name: Notes from Poland,         url: "https://notesfrompoland.com/feed/",                       desk: Europe & NATO-Russia, access: free}
+  - {name: ECFR,                      url: "https://ecfr.eu/feed/",                                   desk: Europe & NATO-Russia, access: free}
+  - {name: RUSI Commentary,           url: "https://www.rusi.org/rss.xml",                            desk: Europe & NATO-Russia, access: free}
+
   # Military / professional
-  - {name: Modern War Institute, url: "https://mwi.westpoint.edu/feed/"}
-  - {name: War on the Rocks, url: "https://warontherocks.com/feed/"}
-  - {name: Wavell Room, url: "https://wavellroom.com/feed/"}
+  - {name: Modern War Institute,      url: "https://mwi.westpoint.edu/feed/",                         desk: Military, access: free}
+  - {name: War on the Rocks,          url: "https://warontherocks.com/feed/",                         desk: Military, access: free}
+  - {name: Wavell Room,               url: "https://wavellroom.com/feed/",                            desk: Military, access: free}
+  - {name: Small Wars Journal,        url: "https://smallwarsjournal.com/feed/",                      desk: Military, access: free}
+  - {name: Defense One,               url: "https://www.defenseone.com/rss/all/",                     desk: Military, access: free}
+  - {name: Breaking Defense,          url: "https://breakingdefense.com/feed/",                       desk: Military, access: free}
+  - {name: CIMSEC,                    url: "https://cimsec.org/feed/",                                desk: Military, access: free}
+  - {name: Irregular Warfare Initiative, url: "https://irregularwarfare.org/feed/",                   desk: Military, access: free}
+  - {name: From the Green Notebook,   url: "https://fromthegreennotebook.com/feed/",                  desk: Military, access: free}
+  - {name: Parameters,                url: "https://press.armywarcollege.edu/parameters/recent.rss",  desk: Military, access: free}
 
   # Magazines & journals
-  - {name: UnHerd, url: "https://unherd.com/feed/"}
-  - {name: Compact, url: "https://www.compactmag.com/feed/"}
-  - {name: City Journal, url: "https://www.city-journal.org/rss.xml"}
-  - {name: First Things, url: "https://www.firstthings.com/rss/web-exclusives"}
-  - {name: The New Criterion, url: "https://newcriterion.com/feed"}
-  - {name: Engelsberg Ideas, url: "https://engelsbergideas.com/feed/"}
+  - {name: UnHerd,                    url: "https://unherd.com/feed/",                                desk: Essays, access: free}
+  - {name: Compact,                   url: "https://www.compactmag.com/feed/",                        desk: Essays, access: free}
+  - {name: City Journal,              url: "https://www.city-journal.org/rss.xml",                    desk: Essays, access: free}
+  - {name: First Things,              url: "https://www.firstthings.com/rss/web-exclusives",          desk: Essays, access: free}
+  - {name: The New Criterion,         url: "https://newcriterion.com/feed",                           desk: Essays, access: subscribed}
+  - {name: Engelsberg Ideas,          url: "https://engelsbergideas.com/feed/",                       desk: Essays, access: free}
+  - {name: American Affairs,          url: "https://americanaffairsjournal.org/feed/",                desk: Essays, access: free}
+  - {name: Palladium,                 url: "https://www.palladiummag.com/feed/",                      desk: Essays, access: free}
+  - {name: The Lamp,                  url: "https://thelampmagazine.com/rss",                         desk: Essays, access: free}
+  - {name: Claremont Review of Books, url: "https://claremontreviewofbooks.com/feed/",                desk: Essays, access: free}
+  - {name: The New Atlantis,          url: "https://www.thenewatlantis.com/feed",                     desk: Essays, access: free}
+  - {name: European Conservative,     url: "https://europeanconservative.com/feed/",                  desk: Essays, access: free}
+  - {name: Mere Orthodoxy,            url: "https://mereorthodoxy.com/rss/",                          desk: Essays, access: free}
+  - {name: Front Porch Republic,      url: "https://www.frontporchrepublic.com/feed/",                desk: Essays, access: free}
+  - {name: Aeon,                      url: "https://aeon.co/feed.rss",                                desk: Back Page, access: free}
 
-  # New additions (2026-07)
-  - {name: American Affairs, url: "https://americanaffairsjournal.org/feed/"}
-  - {name: Palladium, url: "https://www.palladiummag.com/feed/"}
-  - {name: The Lamp, url: "https://thelampmagazine.com/rss"}
-  - {name: Claremont Review of Books, url: "https://claremontreviewofbooks.com/feed/"}
-  - {name: The New Atlantis, url: "https://www.thenewatlantis.com/feed"}
-  - {name: RUSI Commentary, url: "https://www.rusi.org/rss.xml"}
-  - {name: Le Grand Continent, url: "https://legrandcontinent.eu/fr/feed/"}
+  # Continental (French / Spanish, read in the original)
+  - {name: Le Grand Continent,        url: "https://legrandcontinent.eu/fr/feed/",                    desk: Continental, access: free}
+  - {name: El Grand Continent,        url: "https://legrandcontinent.eu/es/feed/",                    desk: Continental, access: free}
+  - {name: Theatrum Belli,            url: "https://theatrum-belli.com/feed/",                        desk: Continental, access: free}
+  - {name: Conflits,                  url: "https://www.revueconflits.com/feed/",                     desk: Continental, access: free}
+  - {name: El Debate,                 url: "https://www.eldebate.com/rss/home.xml",                   desk: Continental, access: free}
+  - {name: Letras Libres,             url: "https://letraslibres.com/feed/",                          desk: Continental, access: free}
+  - {name: The Objective,             url: "https://theobjective.com/feed/",                          desk: Continental, access: free}
+  - {name: Real Instituto Elcano,     url: "https://www.realinstitutoelcano.org/feed/",               desk: Continental, access: free}

@@ -1,6 +1,6 @@
 # HANDOFF — Dispatches (REVEILLE / DEFILADE digest system)
 
-Last updated: 2026-07-16. Written for any model/assistant picking up this project cold.
+Last updated: 2026-09-28. Written for any model/assistant picking up this project cold.
 
 ## What this is
 
@@ -17,7 +17,7 @@ Delivery per issue: (1) an email to his own inbox (sent from his own Gmail via S
 
 ## History (how we got here)
 
-Originally these were two Claude Cowork **scheduled tasks** running on his desktop (`reveille-daily-digest`, `defilade-weekly-digest` — both now **disabled**, do not re-enable without disabling the cloud version, or he gets duplicates). They read Gmail via the Cowork connector, created Gmail drafts, and pushed issues to the repo with a fine-grained PAT. Problems: required his computer to be on and consumed his Claude subscription tokens. In July 2026 the whole pipeline was rebuilt to run on GitHub Actions with the Anthropic API.
+Originally these were two Claude Cowork **scheduled tasks** running on his desktop (`reveille-daily-digest`, `defilade-weekly-digest` — both now **disabled**, do not re-enable without disabling the cloud version, or he gets duplicates). They read Gmail via the Cowork connector, created Gmail drafts, and pushed issues to the repo with a fine-grained PAT. Problems: required his computer to be on and consumed his Claude subscription tokens. In July 2026 the whole pipeline was rebuilt to run on GitHub Actions with the Anthropic API. In October 2026 the pipeline was restructured so the model only returns picks (the script renders the HTML), it runs on Claude Opus paid for by the Max plan's included monthly API credits, and sourcing was rebalanced toward free outlets.
 
 ## Architecture
 
@@ -30,11 +30,17 @@ GitHub Actions (cron, UTC)
        2. FEEDBACK  reads "DISPATCH FEEDBACK" emails (see feedback loop below),
                     merges into feedback.json; NEVER-tagged URLs are excluded
        3. DEDUPE    against published.json "used" list (canonical host+path)
-       4. CURATE    one Claude API call (model env CLAUDE_MODEL, default
-                    claude-sonnet-5): system = prompts/<type>.md, user = JSON
-                    of candidates (+ leftovers pool + feedback). Tolerant HTML
-                    extraction + one corrective retry. If it still fails →
-                    fallback raw-list issue is published (never an empty morning).
+       4. CURATE    Claude API (ANTHROPIC_API_KEY from the Console org linked
+                    to the Max plan; models tried in order: claude-opus-5-5,
+                    claude-sonnet-5-5, claude-sonnet-5; CLAUDE_MODEL overrides;
+                    optional Gemini free-tier backup if GEMINI_API_KEY is set)
+                    returns JSON PICKS only — candidate
+                    id + verbatim quote span + optional link. The script checks
+                    each pick (quote must be verbatim in the excerpt, link must
+                    come from the candidate, max paid links per issue, max 3 per
+                    outlet) and renders the HTML itself. If every model fails or the
+                    picks don't validate → rules-based 'backup edition' (desk
+                    tags from sources.yml, free sources first).
        5. PUBLISH   writes <type>-YYYY-MM-DD.html at repo root, prepends entry
                     to index.json, updates published.json; injects per-article
                     [more · less · never again] mailto links
@@ -50,7 +56,7 @@ GitHub Pages serves the repo root → the "Dispatches" PWA on his phone reads in
 | `.github/workflows/digests.yml` | Schedule + build + commit. **See token limitation below.** |
 | `scripts/build_digest.py` | The entire pipeline (single file, stdlib + 5 deps). |
 | `prompts/reveille.md`, `prompts/defilade.md` | Editorial instructions (plain English — Agustin can edit these himself). |
-| `sources.yml` | Email sender-domain fragments + RSS feed list. Designed for hand-editing. |
+| `sources.yml` | Email senders + RSS feeds, each tagged with a default `desk` and `access` (free / subscribed / paid); link-level `subscribed_domains` / `paid_domains`; `max_paid_per_issue`. Designed for hand-editing. |
 | `published.json` | Ledger: `used` (all published URLs, dedup), `recent_candidates` (7-day pool of unused REVEILLE candidates that DEFILADE mines). |
 | `feedback.json` | Accumulated reader feedback entries `{verb, source, url, date}`. |
 | `index.json` | Issue manifest the PWA reads. Newest first. `{id, type, title, date, file}`. |
@@ -66,7 +72,8 @@ Cron is `41 2 * * 1-6` (UTC) — an odd minute, ~02:41 UTC ≈ 04:41 Poland summ
 
 ## Secrets (repo Settings → Secrets and variables → Actions)
 
-- `ANTHROPIC_API_KEY` — console.anthropic.com key, pay-per-use, separate from his Claude subscription. ~$0.10–0.50/issue.
+- `ANTHROPIC_API_KEY` — key from the Claude Console org that is linked to Agustin's Max plan (claude.ai Settings → Billing → API credits). Max includes monthly API credits that expire each cycle; when they run out, requests stop (no charge) unless the Console org has purchased credits/auto-reload — keep auto-reload OFF. ~$0.30–0.60/issue on Opus.
+- `GEMINI_API_KEY` — optional free Google AI Studio key, used only as backup editor if Claude fails.
 - `GMAIL_ADDRESS` — agustin.tornabene19@gmail.com
 - `GMAIL_APP_PASSWORD` — Google app password (16 chars); grants IMAP read + SMTP send. If Gmail auth ever breaks, first suspect: he rotated his Google password (revokes app passwords).
 
