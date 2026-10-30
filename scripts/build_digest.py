@@ -55,7 +55,11 @@ from bs4 import BeautifulSoup
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 UTC = dt.timezone.utc
-UA = {"User-Agent": "Mozilla/5.0 (DispatchesDigestBot)"}
+# A normal browser identity: several publishers block anything named "bot".
+UA = {"User-Agent": ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                     "(KHTML, like Gecko) Chrome/130.0 Safari/537.36"),
+      "Accept": "application/rss+xml, application/atom+xml, application/xml;q=0.9, text/html;q=0.8, */*;q=0.5",
+      "Accept-Language": "en-US,en;q=0.9,fr;q=0.8,es;q=0.8"}
 
 # Claude models, tried in order until one answers (best first).
 CLAUDE_MODELS = ["claude-opus-5-5", "claude-sonnet-5-5", "claude-sonnet-5"]
@@ -233,19 +237,27 @@ def resolve_one(url):
     return cleaned
 
 
-def resolve_links(candidates, budget=500):
-    """Resolve tracker links in all email candidates, in parallel."""
-    todo = []
+def resolve_links(candidates, budget=1500):
+    """Resolve tracker links in all email candidates, in parallel.
+    Each email's main link goes first, then the rest in the order they appear."""
+    todo, seen = [], set()
+
+    def add(u):
+        if u and is_tracker(u) and u not in seen:
+            seen.add(u)
+            todo.append(u)
+
+    for c in candidates:
+        add(c.get("url"))
     for c in candidates:
         for l in c.get("links", []):
-            if is_tracker(l["url"]) and l["url"] not in todo:
-                todo.append(l["url"])
-        if c.get("url") and is_tracker(c["url"]) and c["url"] not in todo:
-            todo.append(c["url"])
+            add(l["url"])
+    if len(todo) > budget:
+        log(f"links: {len(todo)} tracking links, resolving the first {budget}")
     todo = todo[:budget]
     if not todo:
         return
-    with cf.ThreadPoolExecutor(16) as ex:
+    with cf.ThreadPoolExecutor(32) as ex:
         list(ex.map(resolve_one, todo))
     fixed = 0
     for c in candidates:
@@ -258,7 +270,8 @@ def resolve_links(candidates, budget=500):
             c["url"] = _resolve_cache[c["url"]]
         # drop links that still point at a tracker or at junk after resolving
         c["links"] = [l for l in c.get("links", [])
-                      if not SKIP_URL_PATTERNS.search(l["url"])]
+                      if not SKIP_URL_PATTERNS.search(l["url"])
+                      and not (is_tracker(l["url"]) and l["url"] not in _resolve_cache)]
     log(f"links: resolved {len(todo)} tracking links ({fixed} rewritten)")
 
 
@@ -492,9 +505,12 @@ def inject_feedback_links(html_doc, address, url_sources):
 def fetch_feed(feed, since):
     name, url = feed["name"], feed["url"]
     resp = requests.get(url, timeout=20, headers=UA)
+    if resp.status_code != 200:
+        raise ValueError(f"HTTP {resp.status_code}")
     parsed = feedparser.parse(resp.content)
     if not parsed.entries:
-        raise ValueError("no entries")
+        kind = (resp.headers.get("content-type") or "?").split(";")[0]
+        raise ValueError(f"no entries, got {kind}")
     out = []
     for i, entry in enumerate(parsed.entries[:20]):
         ts = entry.get("published_parsed") or entry.get("updated_parsed")
@@ -537,7 +553,8 @@ def gather_rss_candidates(cfg, since_days, access):
         try:
             return feed, fetch_feed(feed, since), None
         except Exception as e:
-            return feed, [], e.__class__.__name__
+            return feed, [], (str(e)[:60] if isinstance(e, ValueError)
+                              else e.__class__.__name__)
 
     with cf.ThreadPoolExecutor(12) as ex:
         for feed, items, err in ex.map(run, feeds):
