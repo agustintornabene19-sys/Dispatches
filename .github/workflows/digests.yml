@@ -1,19 +1,23 @@
 name: Build digests
 
 on:
+  # PRIMARY trigger: cron-job.org calls the workflow_dispatch API Mon–Sat at
+  # 04:30 Europe/Berlin (DST handled by cron-job.org) with digest=auto, so the
+  # issue lands by ~05:00 German time. API-triggered runs start within seconds.
+  #
+  # BACKUP trigger: GitHub's own scheduler, which runs 5–7+ hours late on this
+  # repo. If the external trigger already published today's issue,
+  # build_digest.py sees the file and skips (no duplicate). If the external
+  # trigger failed, this still produces a (late) issue.
   schedule:
-    # 02:41 UTC ≈ 04:41 in Poland (summer) / 03:41 (winter). Deliberately an
-    # odd minute and NOT the top of the hour: GitHub's shared scheduler is most
-    # backed up at :00, which was pushing runs hours late. Aiming a bit before
-    # 05:00 leaves buffer for any residual best-effort delay.
     - cron: "41 2 * * 1-6"   # Mon–Fri = REVEILLE, Saturday = DEFILADE
-  workflow_dispatch:        # lets you run it manually from the Actions tab
+  workflow_dispatch:        # external cron (digest=auto) or manual from the Actions tab
     inputs:
       digest:
-        description: "Which digest to build"
+        description: "Which digest to build (auto = by weekday: Sat DEFILADE, else REVEILLE)"
         type: choice
-        options: [reveille, defilade]
-        default: reveille
+        options: [auto, reveille, defilade]
+        default: auto
 
 permissions:
   contents: write
@@ -41,7 +45,7 @@ jobs:
       - name: Decide which digest to build
         id: which
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.digest }}" != "auto" ] && [ -n "${{ inputs.digest }}" ]; then
             echo "type=${{ inputs.digest }}" >> "$GITHUB_OUTPUT"
           elif [ "$(date -u +%u)" = "6" ]; then
             echo "type=defilade" >> "$GITHUB_OUTPUT"
