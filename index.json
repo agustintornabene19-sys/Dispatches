@@ -2,6 +2,13 @@
   "generated": "2026-06-25T05:30:00-05:00",
   "issues": [
     {
+      "id": "defilade-2026-11-07",
+      "type": "DEFILADE",
+      "title": "Weekend Reading",
+      "date": "2026-11-07",
+      "file": "defilade-2026-11-07.html"
+    },
+    {
       "id": "reveille-2026-11-06",
       "type": "REVEILLE",
       "title": "Daily Brief",
